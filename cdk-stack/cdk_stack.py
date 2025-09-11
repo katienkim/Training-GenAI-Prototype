@@ -50,8 +50,8 @@ class AiAuditorStack(core.Stack):
         # The UserData script
         user_data = ec2.UserData.for_linux()
 
-        git_repo_url = ""
-        app_dir = ""
+        git_repo_url = "https://github.com/katienkim/Training-GenAI-Prototype.git"
+        app_dir = "/home/ec2-user/app"
 
         user_data.add_commands(
             # 1. Install Dependencies

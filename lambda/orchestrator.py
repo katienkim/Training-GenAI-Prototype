@@ -1,20 +1,8 @@
 from bedrock_agentcore import BedrockAgentCoreApp
 from strands import Agent
-from analyst import analyst_agent
-from reporter import reporter_agent
 import logging
 
-from inspector import list_s3_buckets, list_ec2_instances, list_iam_users
-
 app = BedrockAgentCoreApp()
-
-
-orchestrator_agent = Agent(
-    model="claude-opus-4-1-20250805-v1:0",
-    system_prompt=MAIN_SYSTEM_PROMPT,
-    callback_handler=None,
-    tools=[inspector_agent, analyst_agent, reporter_agent]
-)
 
 @app.entrypoint
 async def orchestrator(payload):
