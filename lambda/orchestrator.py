@@ -1,58 +1,97 @@
-from bedrock_agentcore import BedrockAgentCoreApp
-from strands import Agent
-import logging
+# from bedrock_agentcore import BedrockAgentCoreApp
+import json
+from agents import inspector_agent, analyst_agent, reporter_agent, api_tools, docs_tools, knowledge_tools
+# import logging
 
-app = BedrockAgentCoreApp()
+# app = BedrockAgentCoreApp()
 
-@app.entrypoint
-async def orchestrator(payload):
-    """Orchestrator agent function"""
-    logging.info(f"Agent invocation payload: {payload}")
-    try:
-        user_message = payload.get("prompt", "Hello! How can I help you today?")
-        if not user_message:
-            return {"error": "Prompt not provided in payload."}
-        result = orchestrator_agent(user_message)
-        return {"result": result.message}
-    except Exception as e:
-        logging.error(f"An unexpected error occured: {e}", exc_info=True)
-        return {"error": "An internal error occurred. Please try again later."}
+# @app.entrypoint
+# async def orchestrator(payload):
+#     """Orchestrator agent function"""
+#     logging.info(f"Agent invocation payload: {payload}")
+#     try:
+#         user_message = payload.get("prompt", "Hello! How can I help you today?")
+#         if not user_message:
+#             return {"error": "Prompt not provided in payload."}
+#         result = orchestrator_agent(user_message)
+#         return {"result": result.message}
+#     except Exception as e:
+#         logging.error(f"An unexpected error occured: {e}", exc_info=True)
+#         return {"error": "An internal error occurred. Please try again later."}
 
-if __name__ == "__main__":
-    app.run()
+# if __name__ == "__main__":
+#     app.run()
 
-'''
+def run_audit_swarm(user_query: str) -> str:
+    """
+    Manages the collaborative workflow for the agent swarm.
+    It passes a shared state object between agents, allowing them to
+    progressively enrich the audit findings.
+    """
+    print("--- Starting Audit Swarm ---")
+    
+    # 1. Initialize the shared state (the "blackboard")
+    audit_state = {"query": user_query}
+    print(f"Initial State: {audit_state}")
+
+    # 2. Inspector Phase
+    print("--- Invoking Inspector Agent ---")
+    # The agent expects a string, so we serialize the state to JSON
+    inspector_result = inspector_agent(json.dumps(audit_state))
+    # The agent returns a JSON string, which we parse and update the state with
+    raw_data = json.loads(inspector_result.message)
+    audit_state.update(raw_data)
+    print(f"State after Inspector: {audit_state}")
+
+    # 3. Analyst Phase
+    print("--- Invoking Analyst Agent ---")
+    analyst_result = analyst_agent(json.dumps(audit_state))
+    analysis = json.loads(analyst_result.message)
+    audit_state.update(analysis)
+    print(f"State after Analyst: {audit_state}")
+
+    # 4. Reporter Phase
+    print("--- Invoking Reporter Agent ---")
+    reporter_result = reporter_agent(json.dumps(audit_state))
+    report = json.loads(reporter_result.message)
+    audit_state.update(report)
+    print("--- Audit Swarm Complete ---")
+
+    # 5. Return the final report from the enriched state
+    return audit_state.get("final_report", "The audit concluded, but no final report was generated.")
+
 def lambda_handler(event, context):
     """
-    This function is the entrypoint for the AWS Lambda.
-    It receives the HTTP request from API Gateway, extracts the user's query,
-    invokes the orchestrator, and returns a properly formatted HTTP response.
+    This is the main entrypoint for the AWS Lambda function.
     """
+    # CRITICAL GUARDRAIL: Check if all agent toolsets were loaded successfully.
+    if not all([api_tools, docs_tools, knowledge_tools]):
+        print("Handler check failed: One or more MCP toolsets failed to load. Aborting.")
+        return {
+            'statusCode': 503, # 503 Service Unavailable
+            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+            'body': json.dumps({'error': 'The agent is temporarily unavailable due to a misconfiguration with its tool servers. Please try again later.'})
+        }
+
     try:
         body = json.loads(event.get('body', '{}'))
-        # Use 'query' to match the key from the frontend
         user_query = body.get('query')
 
         if not user_query:
-            return {
-                'statusCode': 400,
-                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'body': json.dumps({'error': 'A "query" is required in the request body.'})
-            }
+            return {'statusCode': 400, 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}, 'body': json.dumps({'error': 'A "query" is required.'})}
 
-        response_body = run_orchestration(user_query)
+        # Kick off the swarm workflow
+        final_report = run_audit_swarm(user_query)
         
-        return {
-            'statusCode': 200,
-            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps(response_body)
+        # Format the final report for the UI
+        response_body = {
+            "answer": final_report,
+            "sources": "Generated by AI Compliance Auditor (Swarm Orchestration)"
         }
+
+        return {'statusCode': 200, 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}, 'body': json.dumps(response_body)}
 
     except Exception as e:
-        print(f"An error occurred: {e}")
-        return {
-            'statusCode': 500,
-            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps({'error': f'An internal server error occurred: {str(e)}'})
-        }
-'''
+        print(f"ERROR: An unexpected error occurred: {e}")
+        return {'statusCode': 500, 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}, 'body': json.dumps({'error': 'An internal server error occurred.'})}
+
