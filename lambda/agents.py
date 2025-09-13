@@ -1,21 +1,21 @@
 import os
 from strands import Agent
 from mcp.client import MCPClient
+from awslabs import aws_api_mcp_server
+from awslabs import aws_documentation_mcp_server
 
 # --- MCP Server Client Configuration ---
 
 # This URL must be provided to the Lambda function as an environment variable.
-API_MCP_URL = os.environ.get("API_MCP_URL")
-DOCS_MCP_URL = os.environ.get("DOCS_MCP_URL")
+# API_MCP_URL = os.environ.get("API_MCP_URL")
+# DOCS_MCP_URL = os.environ.get("DOCS_MCP_URL")
 KNOWLEDGE_MCP_URL = os.environ.get("KNOWLEDGE_MCP_URL")
 # Initialize tool lists
 api_tools, docs_tools, knowledge_tools = [], [], []
 
 # --- Connect to AWS API MCP Server ---
 try:
-    if not API_MCP_URL:
-        raise ValueError("API_MCP_URL is not set.")
-    api_client = MCPClient(base_url=API_MCP_URL)
+    api_client = MCPClient(aws_api_mcp_server.DEFAULT_API_MCP_URL)
     api_tools = api_client.tools
     print(f"Connected to API Server. Tools: {[tool.name for tool in api_tools]}")
 except Exception as e:
@@ -23,9 +23,7 @@ except Exception as e:
 
 # --- Connect to AWS Documentation MCP Server ---
 try:
-    if not DOCS_MCP_URL:
-        raise ValueError("DOCS_MCP_URL is not set.")
-    docs_client = MCPClient(base_url=DOCS_MCP_URL)
+    docs_client = MCPClient(aws_documentation_mcp_server.DEFAULT_DOCS_MCP_URL)
     docs_tools = docs_client.tools
     print(f"Connected to Documentation Server. Tools: {[tool.name for tool in docs_tools]}")
 except Exception as e:

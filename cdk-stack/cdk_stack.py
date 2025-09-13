@@ -5,8 +5,7 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_apigatewayv2 as apigwv2,
     aws_ecr as ecr,
-    aws_elasticloadbalancingv2 as elbv2,
-    aws_s3_assets as s3_assets
+    aws_elasticloadbalancingv2 as elbv2
 )
 from aws_cdk.aws_apigatewayv2_integrations import LambdaProxyIntegration
 
@@ -15,9 +14,9 @@ class AiAuditorStack(core.Stack):
         super().__init__(scope, id, **kwargs)
 
         # --- CDK Parameters for MCP Server URLs ---
-        api_mcp_url = core.CfnParameter(self, "ApiMcpUrl", type="String", description="URL for the AWS API MCP Server")
-        docs_mcp_url = core.CfnParameter(self, "DocsMcpUrl", type="String", description="URL for the AWS Docs MCP Server")
-        knowledge_mcp_url = core.CfnParameter(self, "KnowledgeMcpUrl", type="String", description="URL for the AWS Knowledge MCP Server", default="https://knowledge-mcp.global.api.aws")
+        # api_mcp_url = core.CfnParameter(self, "ApiMcpUrl", type="String", description="URL for the AWS API MCP Server")
+        # docs_mcp_url = core.CfnParameter(self, "DocsMcpUrl", type="String", description="URL for the AWS Docs MCP Server")
+        knowledge_mcp_url = "https://knowledge-mcp.global.api.aws" 
 
         # --- Backend: ECR, Lambda, API Gateway ---
 
@@ -36,8 +35,8 @@ class AiAuditorStack(core.Stack):
             timeout=core.Duration.seconds(60),
             memory_size=1024,
             environment={
-                "API_MCP_URL": api_mcp_url.value_as_string,
-                "DOCS_MCP_URL": docs_mcp_url.value_as_string,
+                # "API_MCP_URL": api_mcp_url.value_as_string,
+                # "DOCS_MCP_URL": docs_mcp_url.value_as_string,
                 "KNOWLEDGE_MCP_URL": knowledge_mcp_url.value_as_string
             }
         )

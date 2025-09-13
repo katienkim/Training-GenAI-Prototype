@@ -1,5 +1,6 @@
 import requests
 import json
+import os
 import streamlit as st
 
 # The CDK script will pass the API Gateway URL as an environment variable to the EC2 instance.
