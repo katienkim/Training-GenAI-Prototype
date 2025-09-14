@@ -28,11 +28,12 @@ class AiAuditorStack(Stack):
         # 1. Create an ECR repository to store our Lambda's container image
         ecr_repository = ecr.Repository(self, "AgentLambdaRepository")
 
+        # 2. Define the Lambda function to use a Docker image from our ECR repository
         agent_lambda = _lambda.Function(self, "AgentLambda",
             code=Code.from_asset("."),
             handler=_lambda.Handler.FROM_IMAGE,
             runtime=_lambda.Runtime.FROM_IMAGE,
-            architecture=_lambda.Architecture.ARM_64,
+            # architecture=_lambda.Architecture.ARM_64,
             timeout=Duration.seconds(60),
             memory_size=1024,
             environment={
@@ -47,6 +48,13 @@ class AiAuditorStack(Stack):
             actions=["bedrock:InvokeModel"],
             resources=[f"arn:aws:bedrock:{self.region}::foundation-model/anthropic.claude-opus-4-1-20250805-v1:0"]
         ))
+        # agent_lambda.add_to_role_policy(iam.PolicyStatement(
+        #     actions=[
+        #         "s3:ListAllMyBuckets", "s3:GetBucket*", "ec2:DescribeInstances",
+        #         "iam:ListUsers", "iam:ListAccessKeys"
+        #     ],
+        #     resources=["*"]
+        # ))
         
         # 3. API Gateway to trigger the Lambda
         http_api = apigwv2.HttpApi(self, "AgentHttpApi",
@@ -96,11 +104,12 @@ class AiAuditorStack(Stack):
 
         # 3. Define the EC2 instance for Streamlit
         instance = ec2.Instance(self, "StreamlitInstance",
-            instance_type=ec2.InstanceType("t4g.micro"),
-            machine_image=ec2.AmazonLinuxImage(
-                generation=ec2.AmazonLinuxGeneration.AMAZON_LINUX_2,
-                cpu_type=ec2.AmazonLinuxCpuType.ARM_64
-            ),
+            instance_type=ec2.InstanceType("t3.micro"),
+            # machine_image=ec2.AmazonLinuxImage(
+            #     generation=ec2.AmazonLinuxGeneration.AMAZON_LINUX_2,
+            #     cpu_type=ec2.AmazonLinuxCpuType.ARM_64
+            # ),
+            machine_image=ec2.AmazonLinuxImage(generation=ec2.AmazonLinuxGeneration.AMAZON_LINUX_2),
             vpc=vpc, vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_NAT),
             security_group=instance_sg, user_data=user_data
         )

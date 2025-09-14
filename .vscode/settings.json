@@ -1,0 +1,17 @@
+{
+    // Exclude these folders from VS Code's file watcher for better performance.
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/node_modules/*/**": true,
+        "**/.venv/**": true,
+        "**/venv/**": true,
+        "**/cdk.out/**": true
+    },
+    // Exclude these folders from the search index.
+    "search.exclude": {
+        "**/.venv/**": true,
+        "**/venv/**": true,
+        "**/cdk.out/**": true
+    }
+}
