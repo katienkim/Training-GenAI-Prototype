@@ -4,5 +4,5 @@ strands-agents>=1.8.0
 awslabs_aws_api_mcp_server>=0.2.13
 awslabs_aws_documentation_mcp_server>=0.1.7
 bedrock-agentcore-starter-toolkit>=0.1.10
-aws-cdk-lib>=2.212.0
+aws-cdk-lib>=2.214.0
 boto3>=1.34.131
