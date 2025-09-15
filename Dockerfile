@@ -5,10 +5,10 @@ FROM public.ecr.aws/lambda/python:3.13
 COPY lambda/requirements.txt ${LAMBDA_TASK_ROOT}
 
 # Install the Python dependencies
-RUN pip install -r requirements.txt
+RUN pip install -r ${LAMBDA_TASK_ROOT}/requirements.txt
 
 # Copy the entire 'lambda' folder with all backend Python code into the container
-COPY lambda/ ${LAMBDA_TASK_ROOT}
+COPY lambda/ ${LAMBDA_TASK_ROOT}/
 
 # Set the command that Lambda will run. This points to the lambda_handler function
 # inside the orchestrator.py file.

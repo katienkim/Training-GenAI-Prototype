@@ -30,10 +30,12 @@ class AiAuditorStack(Stack):
 
         # 2. Define the Lambda function to use a Docker image from our ECR repository
         agent_lambda = _lambda.Function(self, "AgentLambda",
-            code=Code.from_asset("."),
-            handler=_lambda.Handler.FROM_IMAGE,
-            runtime=_lambda.Runtime.FROM_IMAGE,
+            code=_lambda.Code.from_asset("lambda"),
+            # handler=_lambda.Handler.FROM_IMAGE,
+            handler="orchestrator.lambda_handler",
+            # runtime=_lambda.Runtime.FROM_IMAGE,
             # architecture=_lambda.Architecture.ARM_64,
+            runtime=_lambda.Runtime.PYTHON_3_13,
             timeout=Duration.seconds(60),
             memory_size=1024,
             environment={
@@ -48,13 +50,11 @@ class AiAuditorStack(Stack):
             actions=["bedrock:InvokeModel"],
             resources=[f"arn:aws:bedrock:{self.region}::foundation-model/anthropic.claude-opus-4-1-20250805-v1:0"]
         ))
-        # agent_lambda.add_to_role_policy(iam.PolicyStatement(
-        #     actions=[
-        #         "s3:ListAllMyBuckets", "s3:GetBucket*", "ec2:DescribeInstances",
-        #         "iam:ListUsers", "iam:ListAccessKeys"
-        #     ],
-        #     resources=["*"]
-        # ))
+
+        # Grant the Lambda read-only access to AWS resources for inspection
+        agent_lambda.role.add_managed_policy(
+            iam.ManagedPolicy.from_aws_managed_policy_name("ReadOnlyAccess")
+        )
         
         # 3. API Gateway to trigger the Lambda
         http_api = apigwv2.HttpApi(self, "AgentHttpApi",
@@ -78,47 +78,49 @@ class AiAuditorStack(Stack):
         listener = alb.add_listener("PublicListener", port=80, open=True)
         instance_sg = ec2.SecurityGroup(self, "InstanceSG", vpc=vpc)
         instance_sg.connections.allow_from(alb, ec2.Port.tcp(8501), "Allow Streamlit traffic from ALB")
-        user_data = ec2.UserData.for_linux()
         git_repo_url = "https://github.com/katienkim/Training-GenAI-Prototype.git"
 
+        # 1. Open and read the script file
+        with open("./configure_streamlit.sh", "r") as f:
+            user_data_script = f.read()
+
+        # 2. Initialize the UserData object
+        user_data = ec2.UserData.for_linux()
+
+        # 3. Add the script content to the UserData object, replacing the placeholder
         user_data.add_commands(
-            "yum update -y", "yum install -y git python3-pip",
-            f"git clone {git_repo_url} /app",
-            "cd /app/streamlit_ui", "pip3 install -r requirements.txt",
-            f"echo 'API_ENDPOINT_URL={http_api.url}' > .env",
-            """
-            cat <<EOF > /etc/systemd/system/streamlit.service
-            [Unit]
-            Description=Streamlit AI Auditor App
-            [Service]
-            User=ec2-user
-            EnvironmentFile=/app/streamlit_ui/.env
-            WorkingDirectory=/app/streamlit_ui/
-            ExecStart=/usr/local/bin/streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.enableCORS false
-            [Install]
-            WantedBy=multi-user.target
-            EOF
-            """,
-            "systemctl daemon-reload", "systemctl enable streamlit.service", "systemctl start streamlit.service"
+            user_data_script.replace("##API_ENDPOINT_URL##", http_api.url)
         )
 
         # 3. Define the EC2 instance for Streamlit
-        instance = ec2.Instance(self, "StreamlitInstance",
+        instance = ec2.Instance(self, "StreamlitInstanceV1",
+            vpc=vpc,
             instance_type=ec2.InstanceType("t3.micro"),
             # machine_image=ec2.AmazonLinuxImage(
             #     generation=ec2.AmazonLinuxGeneration.AMAZON_LINUX_2,
             #     cpu_type=ec2.AmazonLinuxCpuType.ARM_64
             # ),
-            machine_image=ec2.AmazonLinuxImage(generation=ec2.AmazonLinuxGeneration.AMAZON_LINUX_2),
-            vpc=vpc, vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_NAT),
+            machine_image=ec2.AmazonLinuxImage(generation=ec2.AmazonLinuxGeneration.AMAZON_LINUX_2023, cpu_type=ec2.AmazonLinuxCpuType.X86_64),
+            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             security_group=instance_sg, user_data=user_data
+        )
+
+        instance.role.add_managed_policy(
+            iam.ManagedPolicy.from_aws_managed_policy_name("AmazonSSMManagedInstanceCore")
         )
 
         # 4. Add the EC2 instance as a target for the ALB
         listener.add_targets("EC2Target",
-            port=8501, # Traffic from ALB to EC2 is on streamlit's port
+            port=8501,
             protocol=elbv2.ApplicationProtocol.HTTP,
-            targets=[elbv2_targets.InstanceTarget(instance)]
+            targets=[elbv2_targets.InstanceTarget(instance)],
+            # --- ADD THIS HEALTH CHECK CONFIGURATION ---
+            health_check=elbv2.HealthCheck(
+                path="/healthz",  # Use Streamlit's built-in health check endpoint
+                healthy_threshold_count=2,
+                unhealthy_threshold_count=5,
+                interval=Duration.seconds(30),
+            )
         )
 
         # --- CDK Outputs ---

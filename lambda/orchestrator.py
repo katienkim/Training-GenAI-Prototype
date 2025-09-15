@@ -50,7 +50,7 @@ def run_audit_swarm(user_query: str) -> str:
     audit_state.update(analysis)
     print(f"State after Analyst: {audit_state}")
 
-    # 4. Reporter Phase
+    # 4. Reporter Phase TAKE OUT THE RAW JSON DATA FROM INSPECTOR AFTER GETTING ANALYST RESULT
     print("--- Invoking Reporter Agent ---")
     reporter_result = reporter_agent(json.dumps(audit_state))
     report = json.loads(reporter_result.message)

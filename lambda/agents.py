@@ -56,20 +56,42 @@ Always select the most appropriate tool based on the user's query.
 # The Inspector Agent is a data gatherer. It only knows how to run its tools.
 inspector_agent = Agent(
     model="claude-opus-4-1-20250805-v1:0", # Use a powerful model for data gathering
-    system_prompt="You are a specialized AWS security inspector. Your job is to use the tools you are given to fetch raw data about the AWS environment. Do not analyze or interpret the data.",
+    system_prompt="""
+    You are a specialized AWS inspector bot. Based on the user's request, you must use the available tools to fetch raw configuration data about the AWS environment.
+    Your final response MUST be ONLY the raw JSON output from the tool.
+    Do NOT include any conversational text, explanations, or markdown formatting like ```json.
+    If the tool returns an empty list or an error, return an empty JSON object: {}.
+    If the user's request is not related to AWS resource inspection, respond with: {"message": "No inspection needed."}
+    Always respond in valid JSON format.
+    """,
     tools=api_tools
 )
 
 # The Analyst Agent interprets the raw data from the Inspector.
 analyst_agent = Agent(
     model="claude-opus-4-1-20250805-v1:0", # Use a powerful model for data gathering
-    system_prompt="You are a compliance analyst. You receive raw data in JSON format from an inspector. Your task is to analyze this data and create a simple summary of which resources are non-compliant and why.",
+    system_prompt="""
+    You are a specialized compliance analyst. You will receive raw AWS resource data in JSON format.
+    Your task is to analyze this data against standard security and cost best practices.
+    Create a concise summary of non-compliant resources and explain WHY they are non-compliant.
+    Your output should be a clear, human-readable text analysis.
+    If the input data is empty or contains {"message": "No inspection needed."}, respond with: {"analysis": "No analysis needed."}.
+    Always respond in valid JSON format.
+    """,
     tools=knowledge_tools
 )
 
 # The Reporter Agent makes the final report human-readable.
 reporter_agent = Agent(
     model="claude-opus-4-1-20250805-v1:0", # Use a powerful model for data gathering
-    system_prompt="You are a report writer. You receive a compliance analysis summary. Your job is to format this summary into a clear, concise, human-readable report. Provide a final answer and mention the sources or policies used.",
+    system_prompt="""
+    You are a specialized technical report writer. You will receive a compliance analysis summary.
+    Your job is to format this summary into a clear, concise, final, human-readable report.
+    Use your documentation tools to find and include brief, step-by-step remediation advice for the identified issues.
+    Structure the report clearly with headings for each finding.
+    Provide a final answer and mention the sources or policies used.
+    If the input analysis is empty or contains {"analysis": "No analysis needed."}, respond with: {"final_report": "No report needed."}.
+    Always respond in valid JSON format.
+    """,
     tools=docs_tools
 )
